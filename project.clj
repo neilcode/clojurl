@@ -9,4 +9,6 @@
   :ring {:handler clojurl.handler/app}
   :profiles
   {:dev {:dependencies [[javax.servlet/servlet-api "2.5"]
+                        [proto-repl "0.3.1"]
+                        [org.clojure/tools.namespace "0.2.11"]
                         [ring/ring-mock "0.3.0"]]}})
