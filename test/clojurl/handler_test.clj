@@ -1,9 +1,9 @@
 (ns clojurl.handler-test
   (:require [clojure.test :refer :all]
-            [ring.mock.request :as mock]
             [clojurl.storage :as st]
             [clojurl.storage.in-memory :refer [in-memory-storage]]
             [clojurl.handler :refer :all]))
+
 
 (deftest get-link-test
   (let [stg (in-memory-storage)
@@ -23,9 +23,10 @@
 (deftest create-link-test
   (let [stg (in-memory-storage)
         id "goog"
-        url "http://www.google.com"]
+        url "http://www.google.com"
+        req {:params {:id id :url url}}]
     (testing "returns the id in the response"
-      (let [response (handle-create-link stg id url)]
+      (let [response (handle-create-link stg req)]
         (is (= 201 (:status response)))
         (is (= id (:body response)))))))
 
@@ -33,32 +34,34 @@
   (let [stg (in-memory-storage)
         id "goog"
         url "http://www.google.com"
-        new-url "https://www.googs.com"]
+        new-url "https://www.googs.com"
+        req {:params {:id id :new-url new-url}}
+        bad-req {:params {:id "bogus" :new-url new-url}}
+        ]
     (st/create-link stg id url)
     (testing "returns 200 when successful"
-      (let [response (handle-update-link stg id new-url)]
+      (let [response (handle-update-link stg req)]
         (is (= 200 (:status response)))
         (is (= id (:body response)))))
     (testing "returns a 400 when updating a link that doesn't exist"
-      (let [response (handle-update-link stg "bogus" new-url)]
+      (let [response (handle-update-link stg bad-req)]
         (is (= 404 (:status response)))
         (is (= "No stored link with this id." (:body response)))) )))
-
 
 (deftest delete-link-test
   (let [stg (in-memory-storage)
         id "goog"
         url "http://www.google.com"
-        new-url "https://www.googs.com"]
+        req {:params {:id id}}]
     (st/create-link stg id url)
 
     (testing "deletes a link if it exists"
-      (let [response (handle-delete-link stg id)]
+      (let [response (handle-delete-link stg req)]
         (is (= 200 (:status response)))
-        (is (= 404 (:status (handle-get-link stg id))))))
+        (is (= 404 (:status (handle-get-link stg req))))))
 
     (testing "returns 404 if there's no link stored with given id"
-      (let [response (handle-delete-link stg "bogus")]
+      (let [response (handle-delete-link stg {:params {:id "bogus"}})]
         (is (= 404 (:status response)))
         (is (= "No stored link with this id." (:body response)))))))
 

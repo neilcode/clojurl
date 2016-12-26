@@ -10,24 +10,23 @@
     (response/not-found "Sorry, that's not a valid link.")))
 
 (defn handle-create-link
-  [stg id url]
+  [stg {{:keys [id url]} :params}]
   (if (st/create-link stg id url)
     (-> (response/response id)
         (response/status 201))
     (response/not-found "Sorry, link already taken.")))
 
 (defn handle-update-link
-  [stg id new-url]
+  [stg {{:keys [id new-url]} :params}]
   (if (st/update-link stg id new-url)
     (response/response id)
     (response/not-found "No stored link with this id.") ))
 
 (defn handle-delete-link
-  [stg id]
+  [stg {{:keys [id]} :params}]
   (if (st/delete-link stg id)
     (response/response id)
     (response/not-found "No stored link with this id.") ))
 
 (defn handle-list-links
-  [stg]
-  (response/response (st/list-links stg)))
+  [stg] (response/response (st/list-links stg)))
