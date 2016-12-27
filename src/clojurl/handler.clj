@@ -1,7 +1,9 @@
 (ns clojurl.handler
   (:require [ring.util.request :as request]
             [ring.util.response :as response]
+            [ring.middleware.json :refer [wrap-json-response]]
             [clojurl.storage :as st]))
+
 
 (defn handle-get-link
   [stg id]
@@ -10,23 +12,27 @@
     (response/not-found "Sorry, that's not a valid link.")))
 
 (defn handle-create-link
-  [stg {{:keys [id url]} :params}]
+  [stg id {url :body}]
   (if (st/create-link stg id url)
-    (-> (response/response id)
-        (response/status 201))
-    (response/not-found "Sorry, link already taken.")))
+    (response/response (str "/links/" id))
+    (-> (response/response (format "Sorry, link with id %s already taken." id))
+        (response/status 422))))
 
 (defn handle-update-link
-  [stg {{:keys [id new-url]} :params}]
+  [stg id {new-url :body}]
   (if (st/update-link stg id new-url)
-    (response/response id)
-    (response/not-found "No stored link with this id.") ))
+    (response/response (str "/links/" id))
+    (response/not-found (format "Sorry, no link with id %s found." id)) ))
 
 (defn handle-delete-link
-  [stg {{:keys [id]} :params}]
-  (if (st/delete-link stg id)
-    (response/response id)
-    (response/not-found "No stored link with this id.") ))
+  [stg id]
+  (st/delete-link stg id)
+  (-> (response/response "")
+      (response/status 204)))
 
 (defn handle-list-links
-  [stg] (response/response (st/list-links stg)))
+  [stg]
+  (wrap-json-response
+    (fn [_]
+      (response/response (st/list-links stg)))))
+

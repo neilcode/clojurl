@@ -2,7 +2,9 @@
   (:require [clojure.test :refer :all]
             [clojurl.storage :as st]
             [clojurl.storage.in-memory :refer [in-memory-storage]]
-            [clojurl.handler :refer :all]))
+            [clojurl.handler :refer :all]
+            [ring.mock.request :as mock]
+            [cheshire.core :as json]))
 
 
 (deftest get-link-test
@@ -17,53 +19,77 @@
         (is (= url (get-in response [:headers "Location"])))))
 
     (testing "when ID does not exist"
-      (let [response (get-link stg "foo")]
+      (let [response (handle-get-link stg "foo")]
         (is (= 404 (:status response)))))))
 
 (deftest create-link-test
   (let [stg (in-memory-storage)
         id "goog"
         url "http://www.google.com"
-        req {:params {:id id :url url}}]
-    (testing "returns the id in the response"
-      (let [response (handle-create-link stg req)]
-        (is (= 201 (:status response)))
-        (is (= id (:body response)))))))
+        req (-> (mock/request :post "/links/goog" url)
+                (update :body slurp))]
+
+    (testing "when the id does not already exist"
+      (let [response (handle-create-link stg id req)]
+        (testing "returns a 200 response"
+          (is (= 200 (:status response))))
+        (testing "returns a URI of the shortened url"
+          (is (= (str "/links/" id) (:body response))))
+        (testing "actually stores the url"
+          (is (= url (st/get-link stg id))))))
+
+
+    (testing "when id is already taken"
+      (st/create-link stg id url)
+      (let [response (handle-create-link stg id req)]
+        (testing "Returns a 422 status"
+          (is (= 422 (:status response))))
+        (testing "Returns an error message in the body"
+          (is (= (str "Sorry, link with id " id " already taken.")
+               (:body response))))))))
 
 (deftest update-link-test
   (let [stg (in-memory-storage)
         id "goog"
         url "http://www.google.com"
         new-url "https://www.googs.com"
-        req {:params {:id id :new-url new-url}}
-        bad-req {:params {:id "bogus" :new-url new-url}}
-        ]
-    (st/create-link stg id url)
-    (testing "returns 200 when successful"
-      (let [response (handle-update-link stg req)]
-        (is (= 200 (:status response)))
-        (is (= id (:body response)))))
-    (testing "returns a 400 when updating a link that doesn't exist"
-      (let [response (handle-update-link stg bad-req)]
-        (is (= 404 (:status response)))
-        (is (= "No stored link with this id." (:body response)))) )))
+        req (-> (mock/request :put (str "/links/" id) new-url)
+                (update :body slurp))]
+
+    (testing "When a URL is stored under the given id"
+      (st/create-link stg id url)
+      (let [response (handle-update-link stg id req)]
+        (testing "Returns 200 status"
+          (is (= 200 (:status response))))
+        (testing "Returns the id in the body"
+          (is (= (str "/links/" id) (:body response))))
+        (testing "Link is actually updated"
+          (is (= new-url (st/get-link stg id))))))
+    (testing "When there is no URL stored under the given id"
+      (let [response (handle-update-link stg "bogus-id" req)]
+        (testing "Returns a 404 status"
+          (is (= 404 (:status response))))
+        (testing "Body contains an error message with the unfound id"
+          (is (= (str "Sorry, no link with id bogus-id found.")
+               (:body response))))))))
 
 (deftest delete-link-test
   (let [stg (in-memory-storage)
         id "goog"
-        url "http://www.google.com"
-        req {:params {:id id}}]
-    (st/create-link stg id url)
+        url "http://www.google.com"]
 
-    (testing "deletes a link if it exists"
-      (let [response (handle-delete-link stg req)]
-        (is (= 200 (:status response)))
-        (is (= 404 (:status (handle-get-link stg req))))))
+    (testing "Link exists"
+      (st/create-link stg id url)
+      (let [response (handle-delete-link stg id)]
+        (testing "Returns a 204 status"
+          (is (= 204 (:status response))))
+        (testing "Link is actually deleted"
+          (is (nil? (st/get-link stg id))))))
 
-    (testing "returns 404 if there's no link stored with given id"
-      (let [response (handle-delete-link stg {:params {:id "bogus"}})]
-        (is (= 404 (:status response)))
-        (is (= "No stored link with this id." (:body response)))))))
+    (testing "Link does not exist"
+      (let [response (handle-delete-link stg "bogus")]
+        (testing "Returns 204 status"
+          (is (= 204 (:status response))))))))
 
 (deftest list-links-test
   (let [stg (in-memory-storage)
@@ -71,12 +97,14 @@
                "gmail" "www.gmail.com"
                "yahoo" "www.isyahoodeadyet.com"}]
 
-    (st/create-link stg "foo" "www.foobar.com")
-    (st/create-link stg "gmail" "www.gmail.com")
-    (st/create-link stg "yahoo" "www.isyahoodeadyet.com")
+    (doseq [[id url] links]
+      (st/create-link stg id url))
 
-    (testing "returns a list of stored links"
-      (let [response (handle-list-links stg)]
-        (is (= 200 (:status response)))
-        (is (= links (:body response)))))))
+    (let [handler (handle-list-links stg)
+          response (handler (mock/request :get "/links"))]
 
+      (testing "returns a 200 HTTP status"
+        (is (= 200 (:status response))))
+
+      (testing "returns result of list-links encoded in JSON"
+        (is (= links (json/decode (:body response))))))))

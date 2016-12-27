@@ -1,12 +1,13 @@
 (ns clojurl.app
  (:require [clojurl.routes :as routes]
-           [clojurl.middleware :as middleware]
-           [ring.middleware.defaults :refer [wrap-defaults api-defaults]]
-           [ring.middleware.params :as params]
-           [ring.mock.request :as mock]
-           [clojurl.handler :as handler]))
+           [clojurl.storage.in-memory :refer [in-memory-storage]]
+           ;[ring.middleware.defaults :refer [wrap-defaults api-defaults secure-api-defaults]]
+           ;[ring.middleware.params :as params]
+           ))
 
-(def app
-  (wrap-defaults clojurl.routes/app-routes api-defaults))
+(def store (in-memory-storage)) ;; TOOD: add config to use
+                                ;; db backed storage when in production
+
+(def app  (routes/shortener-routes store))
 
 
