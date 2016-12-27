@@ -3,7 +3,8 @@
            [clojurl.storage.in-memory :refer [in-memory-storage]]
            [compojure.handler :refer [site]]
            [ring.adapter.jetty :as jetty]
-           [environ.core :refer [env]]))
+           [environ.core :refer [env]])
+ (:gen-class))
 
 (def store (in-memory-storage)) ;; TOOD: add config to use
                                 ;; db backed storage when in production
