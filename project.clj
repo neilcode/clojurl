@@ -9,7 +9,8 @@
                  [ring/ring-json "0.4.0"]
                  [ring/ring-defaults "0.1.5"]]
   :plugins [[lein-ring "0.9.7"]]
-  :ring {:handler clojurl.handler/app}
+  :ring {:handler clojurl.app/app
+         :port 3084}
   :profiles
   {:dev {:dependencies [[javax.servlet/servlet-api "2.5"]
                         [ring/ring-mock "0.3.0"]]}})
