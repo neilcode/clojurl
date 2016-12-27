@@ -1,0 +1,5 @@
+{
+  "name": "Clojurl",
+  "description": "A basic url shortener service",
+  "image": "heroku/clojure",
+}
